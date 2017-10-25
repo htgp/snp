@@ -1,0 +1,1 @@
+cat ../sc61.gff | sed -e 's/^chr1\t/I\t/;s/^chr2\t/II\t/;s/^chr3\t/III\t/;s/^chr4\t/IV\t/;s/^chr5\t/V\t/;s/^chr6\t/VI\t/;s/^chr7\t/VII\t/;s/^chr8\t/VIII\t/;s/^chr9\t/IX\t/;s/^chr10\t/X\t/;s/^chr11\t/XI\t/;s/^chr12\t/XII\t/;s/^chr13\t/XIII\t/;s/^chr14\t/XIV\t/;s/^chr15\t/XV\t/;s/^chr16\t/XVI\t/;s/^chrM\t/Mito\t/' >sc61_rome.gff

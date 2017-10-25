@@ -1,0 +1,295 @@
+#!/usr/bin/perl
+use Bio::Seq;
+use Bio::SeqIO;
+
+$upstream=100;
+
+sub snp2aa{
+	my($snp_chr,$snp_pos,$snp,$gff_ref)=@_;
+	# print "in snp2aa, paras are : $snp_chr,$snp_pos,$snp,$gff_ref.\n";
+	my($aa, $gnm,$abpos)=&snp_location_and_translation($snp_chr,$snp_pos,$snp,$gff_ref);
+	# print "gnm in snp2aa: ",$gnm,"\n";
+	return $aa, $gnm,$abpos;
+	}
+sub nt2aa{
+{   
+    my($codon) = @_;   
+    # print "in nt2aa, para condon accepted is: $codon.\n";
+    $codon = uc $codon;#uc=uppercase;lc=lowercase  
+    my(%genetic_code) = (
+    'TCA' => 'S',    # Serine   
+    'TCC' => 'S',    # Serine   
+    'TCG' => 'S',    # Serine   
+    'TCT' => 'S',    # Serine   
+    'TTC' => 'F',    # Phenylalanine   
+    'TTT' => 'F',    # Phenylalanine   
+    'TTA' => 'L',    # Leucine   
+    'TTG' => 'L',    # Leucine   
+    'TAC' => 'Y',    # Tyrosine    
+    'TAT' => 'Y',    # Tyrosine   
+    'TAA' => '*',    # Stop   
+    'TAG' => '*',    # Stop   
+    'TGC' => 'C',    # Cysteine   
+    'TGT' => 'C',    # Cysteine   
+    'TGA' => '*',    # Stop   
+    'TGG' => 'W',    # Tryptophan   
+    'CTA' => 'L',    # Leucine   
+    'CTC' => 'L',    # Leucine   
+    'CTG' => 'L',    # Leucine   
+    'CTT' => 'L',    # Leucine   
+    'CCA' => 'P',    # Proline   
+    'CCC' => 'P',    # Proline   
+    'CCG' => 'P',    # Proline   
+    'CCT' => 'P',    # Proline   
+    'CAC' => 'H',    # Histidine   
+    'CAT' => 'H',    # Histidine   
+    'CAA' => 'Q',    # Glutamine   
+    'CAG' => 'Q',    # Glutamine   
+    'CGA' => 'R',    # Arginine   
+    'CGC' => 'R',    # Arginine   
+    'CGG' => 'R',    # Arginine   
+    'CGT' => 'R',    # Arginine   
+    'ATA' => 'I',    # Isoleucine   
+    'ATC' => 'I',    # Isoleucine   
+    'ATT' => 'I',    # Isoleucine   
+    'ATG' => 'M',    # Methionine   
+    'ACA' => 'T',    # Threonine   
+    'ACC' => 'T',    # Threonine   
+    'ACG' => 'T',    # Threonine   
+    'ACT' => 'T',    # Threonine   
+    'AAC' => 'N',    # Asparagine   
+    'AAT' => 'N',    # Asparagine   
+    'AAA' => 'K',    # Lysine   
+    'AAG' => 'K',    # Lysine   
+    'AGC' => 'S',    # Serine   
+    'AGT' => 'S',    # Serine   
+    'AGA' => 'R',    # Arginine   
+    'AGG' => 'R',    # Arginine   
+    'GTA' => 'V',    # Valine   
+    'GTC' => 'V',    # Valine   
+    'GTG' => 'V',    # Valine   
+    'GTT' => 'V',    # Valine   
+    'GCA' => 'A',    # Alanine   
+    'GCC' => 'A',    # Alanine   
+    'GCG' => 'A',    # Alanine   
+    'GCT' => 'A',    # Alanine       
+    'GAC' => 'D',    # Aspartic Acid   
+    'GAT' => 'D',    # Aspartic Acid   
+    'GAA' => 'E',    # Glutamic Acid   
+    'GAG' => 'E',    # Glutamic Acid   
+    'GGA' => 'G',    # Glycine   
+    'GGC' => 'G',    # Glycine   
+    'GGG' => 'G',    # Glycine   
+    'GGT' => 'G',    # Glycine   
+    );   
+   
+    if(exists $genetic_code{$codon})   
+    {   
+       # print $genetic_code{$codon}," is the aa.\n";
+       return $genetic_code{$codon};   
+    }  
+    else  
+    {   
+            print STDERR "Bad codon \"$codon\"!!\n";   
+            exit;   
+    }   
+}  
+	}
+sub get_tripleton{
+	#return a tripleton;
+	my($snp_p,$gl,$gr)=@_;
+	$modul=($snp_p-$gl+1)%3;
+	if($modul==0){$ogl=$snp_p-2;$ogr=$snp_p;}
+	elsif($modul==2){$ogl=$snp_p-1;$ogr=$snp_p+1;}
+	else{$ogl=$snp_p,$ogl=$snp+2;}
+	return $modul,$ogl,$ogr;
+	}
+sub verify_snp{
+	#is the snp provided identical to the fasta file at same position?
+	}
+sub process_cds{
+	($snp_pos,$pckey,$snp,$g_hash)=@_;
+	%gff=%{$g_hash};
+	$gene_left=(parse_line($pckey))[1];$gene_right=(parse_line($pckey))[2];$direct=(parse_line($pckey))[4];
+	($mod,$ngl,$ngr)=&get_tripleton($snp_pos,$gene_left,$gene_right);
+	# print "module,tripleton_left,tripleton_right are: $mod,$ngl,$ngr.\n";
+	undef @tmparr,$aref,$tripleton,$outaa;
+	$aref=&parse_line($pckey);
+	@tmparr=@{$aref};
+	$tripleton=&extract_sequence($tmparr[0],$ngl,$ngr,,);
+	# print "got tripleton: $tripleton.";
+	if($mod==0){$tripleton=&replace($tripleton,3,$snp);}#print "kicked in tripleton: $tripleton.\n";
+	if($mod==1){$tripleton=&replace($tripleton,1,$snp);}#print "kicked in tripleton: $tripleton.\n";
+	if($mod==2){$tripleton=&replace($tripleton,2,$snp);}#print "kicked in tripleton: $tripleton.\n";
+	if($tmparr[4] eq "-"){$tripleton=&rc_short_seq($tripleton);}
+	$outaa=&nt2aa($tripleton);
+	# print "got aa: $outaa\n########################################################\n";
+	return $outaa;
+	}
+sub replace{
+		($ori,$site,$kicker)=@_;
+		@parse=split('',$ori);
+		$parse[$site-1]=$kicker;
+		return join('',@parse);
+		}
+sub process_RNAs{
+	print "RNA change";
+}
+sub rc_short_seq{
+	($ss)=(@_);
+	$rc_out="";
+	@ss_arr=split('',$ss);
+	# print "split tripleton in rc_short_seq, ", join(',',@ss_arr),"\n";
+	for($i=scalar(@ss_arr);$i>0;$i--){
+		if(uc $ss_arr[$i-1] eq "A"){$rc_out .=  "T";}
+		if(uc $ss_arr[$i-1] eq "T"){$rc_out .=  "A";}
+		if(uc $ss_arr[$i-1] eq "C"){$rc_out .=  "G";}
+		if(uc $ss_arr[$i-1] eq "G"){$rc_out .=  "C";}
+}
+		return $rc_out;
+}
+sub extract_sequence{
+	($chr,$start,$end,$direction,$info)=@_;
+	$io=Bio::SeqIO->new(-file=>'sc61.fa',-format=>'Fasta');
+	while($seq=$io->next_seq()){
+	$gene_name=$seq->display_id();
+		if($gene_name eq $chr){
+			$outseq=$seq->subseq($start,$end);
+			# print "$outseq\n";
+			return $outseq;
+		}
+		}
+	}
+sub random_seq{
+	($len)=@_;
+	$outseq="";
+	while($i<$len){
+		@nucleotides=qw/A T G C/;  
+		$newbase=$nucleotides[rand @nucleotides];  
+		$outseq .= $newbase;
+		++$i;
+		} 
+		return $outseq
+}		
+sub hash_gff{
+	($file)=@_;
+	open fl,"<",$file or die open "open gff file failed...";
+	while(<fl>){
+		chomp;
+		if(!/^#/){
+			# {'chr'}=$arr[0];
+			# {'start'}=$arr[1];
+			# {'end'}=$arr[2];
+			# {'type'}=$arr[3];
+			# {'direction'}=$arr[4];
+			# {'info'}=$arr[5];
+			$gff{$_}=1;
+		}
+	}
+	close f1;
+	# print "chr:$arr[0]\nstart:$arr[1]\nend:$arr[2]\ntype:$arr[3]\ndirection:$arr[4]\ninfo:$arr[5]\n";
+	return %gff;
+	}
+sub snp_location_and_translation{
+	my($chr,$pos,$snp,$href)=@_;
+	# print "in process snp_location_and_translation,paras are: $chr,$pos,$snp,$href.\n";
+	for $key(keys %$href){
+		$aref=&parse_line($key);
+		@tmparr=@{$aref};
+		# print "Doing SLAT, parsed keys are: ",$tmparr[0]," ",$tmparr[1]," ",$tmparr[2]," ",$tmparr[3]," ",$tmparr[4],"...\n";
+		# print "judge type...\n";
+		if(($tmparr[0] eq $chr && $tmparr[1]-$upstream<=$pos && $pos<=$tmparr[1] && $temarr[4] eq "+") || ($tmparr[0] eq $chr && $tmparr[2]<=$pos && $pos<=$tmparr[2]+$upstream && $temarr[4] eq "-")) {
+			print "-100 upstream of coding region, may have a impact.\n";
+			my $gnm=&get_gene_name($tmparr[5]);
+			}
+		if($tmparr[0] eq $chr && $tmparr[1]<=$pos && $pos<=$tmparr[2]){
+			if($tmparr[3] eq 'CDS'){
+				# print "CDS region.\n";
+				$outaa=&process_cds($pos,$key,$snp,$href);
+				$gnm=&get_gene_name($tmparr[5]);
+				# print "gnm in SLAT is: ",$gnm,"\n";
+				if($tmparr[4] eq "+"){
+					$ab_aa_pos=&aa_abs_pos($tmparr[1],$pos);
+					}
+				else{
+					$ab_aa_pos=&aa_abs_pos($pos,$tmparr[2]);
+					}
+					}
+			elsif($tmparr[3] =~ /RNA/){
+				&process_RNAs($key);
+				my $gnm=&get_gene_name($tmparr[5]);
+				if($tmparr[4] eq "+"){
+					$ab_aa_pos=$pos-$tmparr[1];
+					}
+				else{
+					$ab_aa_pos=$tmparr[2]-$pos;
+					}				
+				}
+			else{
+				# print "other types...\n";
+			 }
+			}
+			}
+			# print "gnm in SLAT before return is: ",$gnm,"\n";
+			return $outaa,$gnm,$ab_aa_pos;
+			}
+sub nc_location{
+	my($chr,$pos,$snp,$href)=@_;
+	for $key(keys %$href){
+		$aref=&parse_line($key);
+		@tmparr=@{$aref};
+		if($tmparr[0] eq $chr && $tmparr[1]<=$pos && $pos<=$tmparr[2]){
+		if($tmparr[3] eq 'CDS'){
+				my $gnm=&get_gene_name($tmparr[5]);
+				print "indel induced CDS frame shift at site $pos of protein $gnm.\n";
+			}
+		elsif($tmparr[3] =~ /RNA/){
+				&process_RNAs($key);
+			my	$gnm=&get_gene_name($tmparr[5]);
+			print " at site $pos of $tmparr[3] $gnm.\n";
+				}	
+		else{}
+	}
+}
+return $gnm;
+}
+sub aa_abs_pos{
+	my ($p1,$p2)=@_;
+	my $out=int(($p2-$p1)/3+0.99);
+	# print "aa_abs_pos, paras accepted are: $p1,$p2, result is: $out.\n";
+	return $out;
+}
+sub get_gene_name{
+	(my $info)=@_;
+	# print "in get_gene_name,info is: $info.\n";
+	$info=~/.*;Name=([A-Z]{1,3}[0-9]{3,4}[A-Z]{0,1}-{0,1}[A-Z]{0,1});.*/;
+	# print "after matching, the name is: $1.\n";
+	return $1;
+}	
+sub parse_line{
+	($line)=@_;
+	my ($chr,$db,$type,$gl,$gr,$u1,$dir,$u2,$info)=split('\t',$line);
+	@arr=($chr,$gl,$gr,$type,$dir,$info);
+	return \@arr;
+	}
+sub is_snp{
+	@nts=@_;
+	# print join('_',@nts),"\n";
+	$flag=1;
+	for(@nts){
+		# print "$_,$flag\n";
+		if(length($_) != 1){
+			$flag=0;
+			}
+		if($flag eq 0){
+			return 0;
+			last;
+			}
+		}
+		if($flag eq 1){
+			return 1;
+			}
+		}
+	
+	
+1;
